@@ -24,6 +24,7 @@ def close_db(e=None):
 def init_db(app):
     app.teardown_appcontext(close_db)
     with app.app_context():
+        os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
         db = sqlite3.connect(DB_PATH)
         db.row_factory = sqlite3.Row
         db.executescript('''
