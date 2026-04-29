@@ -4,3 +4,4 @@ anthropic>=0.79
 python-dotenv>=1.2
 zstandard>=0.22
 pandas>=2.3
+gunicorn>=21.2

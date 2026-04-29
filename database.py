@@ -1,10 +1,11 @@
+import os
 import sqlite3
 import json
 import datetime
 from collections import Counter
 from flask import g
 
-DB_PATH = 'puzzles.db'
+DB_PATH = os.environ.get('DB_PATH', 'puzzles.db')
 
 
 def get_db():
