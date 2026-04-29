@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}Pattern Eye — Chess Tactics{% endblock %}
+
+{% block content %}
+<div class="text-center mb-10 mt-4">
+  <h1 class="text-4xl font-bold tracking-tight text-amber-400">Pattern Eye</h1>
+  <p class="text-gray-500 mt-2 text-sm tracking-wide uppercase">Chess Tactics Trainer</p>
+</div>
+
+{% if error %}
+<div class="mb-6 p-4 bg-red-950 border border-red-800 rounded-xl text-red-300 text-sm text-center">
+  {{ error }}
+</div>
+{% endif %}
+
+<!-- Stats grid -->
+<div class="grid grid-cols-3 gap-4 mb-5">
+  <div class="bg-gray-900 rounded-2xl p-5 text-center border border-gray-800">
+    <p class="text-3xl font-bold text-white">{{ stats.current_rating }}</p>
+    <p class="text-xs text-gray-500 mt-1 uppercase tracking-wider">Rating</p>
+  </div>
+  <div class="bg-gray-900 rounded-2xl p-5 text-center border border-gray-800">
+    <p class="text-3xl font-bold text-white">{{ stats.total_solved }}</p>
+    <p class="text-xs text-gray-500 mt-1 uppercase tracking-wider">Solved</p>
+  </div>
+  <div class="bg-gray-900 rounded-2xl p-5 text-center border border-gray-800
+    {% if stats.session_streak > 0 %}border-amber-800{% endif %}">
+    <p class="text-3xl font-bold {% if stats.session_streak > 0 %}text-amber-400{% else %}text-white{% endif %}">
+      {{ stats.session_streak }}
+    </p>
+    <p class="text-xs text-gray-500 mt-1 uppercase tracking-wider">Day Streak</p>
+    {% if stats.last_trained_date == today and stats.session_streak > 0 %}
+    <p class="text-xs text-green-500 mt-1">trained today</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- 7-day training calendar -->
+<div class="flex justify-center gap-2 mb-8">
+  {% for day in calendar %}
+  <div class="flex flex-col items-center gap-1">
+    <div class="w-7 h-7 rounded-full border-2
+      {% if day.trained %}bg-amber-500 border-amber-500{% else %}bg-transparent border-gray-700{% endif %}">
+    </div>
+    <span class="text-gray-600 text-xs">{{ day.date[8:] }}</span>
+  </div>
+  {% endfor %}
+</div>
+
+<a href="{{ url_for('start_session') }}"
+   class="block w-full py-5 text-center text-lg font-semibold bg-amber-500 hover:bg-amber-400 text-gray-950 rounded-2xl transition-colors duration-150 shadow-lg">
+  Start Session
+</a>
+
+<div class="text-center mt-8">
+  <a href="{{ url_for('dashboard') }}" class="text-gray-600 hover:text-gray-400 text-sm transition-colors">
+    View Dashboard
+  </a>
+</div>
+{% endblock %}

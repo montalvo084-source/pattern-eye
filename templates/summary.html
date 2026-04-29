@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% block title %}Session Results — Pattern Eye{% endblock %}
+
+{% block content %}
+<div class="text-center mb-8 mt-2">
+  <h1 class="text-2xl font-bold text-white">Session Complete</h1>
+  <p class="text-gray-500 text-sm mt-1">
+    {{ correct_count }} / {{ total }} correct
+  </p>
+  <p class="text-gray-400 text-sm mt-2 italic">{{ session_message }}</p>
+</div>
+
+<!-- Score summary -->
+<div class="grid grid-cols-3 gap-3 mb-8">
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4 text-center">
+    <p class="text-2xl font-bold text-green-400">{{ correct_count }}</p>
+    <p class="text-xs text-gray-500 mt-1 uppercase tracking-wider">Correct</p>
+  </div>
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4 text-center">
+    <p class="text-2xl font-bold text-red-400">{{ incorrect_count }}</p>
+    <p class="text-xs text-gray-500 mt-1 uppercase tracking-wider">Missed</p>
+  </div>
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4 text-center">
+    <p class="text-2xl font-bold text-white">{{ stats.current_rating }}</p>
+    <p class="text-xs text-gray-500 mt-1 uppercase tracking-wider">Rating</p>
+  </div>
+</div>
+
+<!-- Puzzle result tiles -->
+<div class="grid grid-cols-5 gap-2 mb-8">
+  {% for r in results %}
+  <div class="aspect-square rounded-xl flex items-center justify-center text-lg font-bold
+    {% if r.result == 'correct' %}bg-green-900 border border-green-700 text-green-400
+    {% elif r.result == 'incorrect' %}bg-red-950 border border-red-900 text-red-400
+    {% else %}bg-gray-900 border border-gray-800 text-gray-500
+    {% endif %}">
+    {% if r.result == 'correct' %}✓
+    {% elif r.result == 'incorrect' %}✗
+    {% else %}—
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Puzzle breakdown -->
+<div class="space-y-2 mb-8">
+  {% for r in results %}
+  <div class="flex items-center justify-between px-4 py-2.5 bg-gray-900 rounded-xl border border-gray-800 text-sm">
+    <div class="flex items-center gap-3">
+      <span class="{% if r.result == 'correct' %}text-green-400{% elif r.result == 'incorrect' %}text-red-400{% else %}text-gray-500{% endif %} font-bold w-4">
+        {% if r.result == 'correct' %}✓{% elif r.result == 'incorrect' %}✗{% else %}—{% endif %}
+      </span>
+      <span class="text-gray-400">Rating {{ r.rating }}</span>
+    </div>
+    <div class="flex items-center gap-3">
+      {% if r.themes %}
+      <span class="text-gray-600 text-xs">{{ r.themes.split()[:2] | join(', ') }}</span>
+      {% endif %}
+      <span class="text-gray-600 text-xs font-mono">{{ r.time_taken }}s</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Actions -->
+<div class="flex gap-3">
+  <a href="{{ url_for('start_session') }}"
+     class="flex-1 py-4 text-center font-semibold bg-amber-500 hover:bg-amber-400 text-gray-950 rounded-2xl transition-colors">
+    Train Again
+  </a>
+  <a href="{{ url_for('dashboard') }}"
+     class="flex-1 py-4 text-center font-semibold bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-2xl transition-colors">
+    Dashboard
+  </a>
+</div>
+
+<div class="text-center mt-6">
+  <a href="{{ url_for('index') }}" class="text-gray-700 hover:text-gray-500 text-sm transition-colors">Home</a>
+</div>
+{% endblock %}

@@ -1,0 +1,6 @@
+Flask>=3.1
+python-chess>=1.999
+anthropic>=0.79
+python-dotenv>=1.2
+zstandard>=0.22
+pandas>=2.3

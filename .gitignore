@@ -1,0 +1,12 @@
+.env
+puzzles.db
+lichess_db_puzzle.csv.zst
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+*.egg-info/
+dist/
+build/
+.venv/
+venv/

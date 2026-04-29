@@ -1,0 +1,372 @@
+{% extends 'base.html' %}
+{% block title %}Puzzle {{ puzzle_number }} of {{ total_puzzles }} — Pattern Eye{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet"
+      href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+<style>
+  #board .square-55d63 { transition: background-color 0.15s; }
+  .highlight-correct { background-color: rgba(74, 222, 128, 0.45) !important; }
+  .highlight-wrong   { background-color: rgba(239, 68, 68, 0.45) !important; }
+  .selected-sq       { background-color: rgba(251,191,36,0.35) !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Hidden data bridge -->
+<div id="puzzle-data"
+     data-fen="{{ puzzle.fen }}"
+     data-moves="{{ moves | join(' ') }}"
+     data-orientation="{{ orientation }}"
+     data-puzzle-id="{{ puzzle.id }}"
+     data-attempt-url="{{ url_for('attempt_puzzle', puzzle_id=puzzle.id) }}"
+     data-skip-url="{{ url_for('skip_puzzle', puzzle_id=puzzle.id) }}"
+     data-hint-url="{{ url_for('hint_puzzle', puzzle_id=puzzle.id) }}"
+     class="hidden">
+</div>
+
+<!-- Progress bar -->
+<div class="mb-4">
+  <div class="flex justify-between items-center mb-2">
+    <span class="text-xs text-gray-500 uppercase tracking-wider">Puzzle {{ puzzle_number }} of {{ total_puzzles }}</span>
+    <span id="timer" class="text-xs text-gray-600 font-mono">0:00</span>
+  </div>
+  <div class="w-full bg-gray-800 rounded-full h-1.5">
+    <div class="bg-amber-500 h-1.5 rounded-full transition-all duration-300"
+         style="width: {{ ((puzzle_number - 1) / total_puzzles * 100)|int }}%"></div>
+  </div>
+</div>
+
+<!-- Side to move — prominent color badge -->
+<div class="flex justify-center mb-4">
+  <div class="flex items-center gap-3 px-5 py-3 rounded-2xl border
+    {% if orientation == 'white' %}border-white/25 bg-white/8
+    {% else %}border-gray-400/30 bg-gray-700/20{% endif %}">
+    <div class="w-5 h-5 rounded-full ring-2 flex-shrink-0
+      {% if orientation == 'white' %}bg-white ring-white/40
+      {% else %}bg-gray-950 ring-gray-400/60{% endif %}"></div>
+    <span id="side-label" class="text-white font-semibold text-base tracking-wide">
+      You are playing {{ side_to_move }}
+    </span>
+  </div>
+</div>
+
+<!-- Board -->
+<div id="board-wrapper" class="relative mx-auto transition-all duration-150" style="max-width: 480px;">
+  <div id="board" style="width: 100%;"></div>
+</div>
+
+<!-- Coach card -->
+<div id="coach-card" class="mt-4 p-4 bg-gray-900 rounded-2xl border border-gray-800">
+  <p id="coach-text" class="text-gray-400 text-sm leading-relaxed">{{ coach_message }}</p>
+  <button id="hint-btn" class="mt-2.5 text-xs text-gray-600 hover:text-amber-400 transition-colors">
+    Get a hint →
+  </button>
+</div>
+
+<!-- Skip button -->
+<div class="flex justify-center mt-4">
+  <button id="skip-btn"
+          class="py-3 px-6 text-sm text-gray-600 hover:text-gray-400 border border-gray-800 hover:border-gray-600 rounded-lg transition-colors">
+    Skip
+  </button>
+</div>
+
+<!-- Praise card — hidden until correct answer -->
+<div id="praise-card" class="hidden mt-6 p-5 bg-gray-900 rounded-2xl border border-green-800">
+  <p id="praise-text" class="text-green-300 text-sm leading-relaxed"></p>
+  <a id="praise-next-btn" href="#"
+     class="mt-4 block text-center text-sm py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition-colors">
+    Next Puzzle →
+  </a>
+</div>
+
+<!-- Explanation card — hidden until wrong answer -->
+<div id="explanation-card" class="hidden mt-6 p-5 bg-gray-900 rounded-2xl border border-red-900">
+  <div class="flex items-start gap-3">
+    <div class="flex-shrink-0 w-2 h-2 rounded-full bg-red-500 mt-1.5"></div>
+    <div class="flex-1">
+      <p id="explanation-move" class="text-red-400 font-semibold text-sm mb-2"></p>
+      <p id="explanation-text" class="text-gray-300 text-sm leading-relaxed"></p>
+    </div>
+  </div>
+  <p id="retry-note" style="display:none;" class="mt-3 text-xs text-amber-500">
+    This puzzle will come back at the end of your session — you'll get another shot.
+  </p>
+  <a id="next-btn" href="#"
+     class="mt-4 block text-center text-sm py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition-colors">
+    Next Puzzle →
+  </a>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // ---- Read data from DOM ----
+  const pd          = document.getElementById('puzzle-data').dataset;
+  const FEN         = pd.fen;
+  const MOVES       = pd.moves.split(' ');
+  const ORIENTATION = pd.orientation;
+  const ATTEMPT_URL = pd.attemptUrl;
+  const SKIP_URL    = pd.skipUrl;
+  const HINT_URL    = pd.hintUrl;
+
+  // ---- State ----
+  let game, board;
+  let locked         = true;
+  let lastSource, lastTarget;
+  let startTime      = Date.now();
+  let timerInterval;
+  let selectedSquare = null;
+
+  // ---- Init ----
+  document.addEventListener('DOMContentLoaded', function () {
+    game = new Chess();
+    game.load(FEN);
+
+    board = Chessboard('board', {
+      position:      FEN,
+      orientation:   ORIENTATION,
+      draggable:     true,
+      pieceTheme:    'https://lichess1.org/assets/piece/cburnett/{piece}.svg',
+      onDrop:        handleDrop,
+      onSnapEnd:     function () { board.position(game.fen()); },
+      onSquareClick: handleSquareClick
+    });
+
+    setTimeout(function () {
+      animateMove(MOVES[0], function () {
+        locked = false;
+      });
+    }, 500);
+
+    startTimer();
+
+    document.getElementById('skip-btn').addEventListener('click', skipPuzzle);
+
+    document.getElementById('hint-btn').addEventListener('click', function () {
+      var btn = this;
+      btn.textContent = 'Thinking…';
+      btn.disabled = true;
+      fetch(HINT_URL)
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          document.getElementById('coach-text').textContent = data.hint;
+          btn.style.display = 'none';
+        })
+        .catch(function () {
+          document.getElementById('coach-text').textContent = 'Trust your instincts — look for the forcing move.';
+          btn.style.display = 'none';
+        });
+    });
+  });
+
+  // ---- Timer ----
+  function startTimer() {
+    timerInterval = setInterval(function () {
+      var elapsed = Math.floor((Date.now() - startTime) / 1000);
+      document.getElementById('timer').textContent = formatTime(elapsed);
+    }, 1000);
+  }
+
+  function stopTimer() { clearInterval(timerInterval); }
+
+  function formatTime(s) {
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+
+  // ---- Highlight helpers (for tap-to-move) ----
+  function clearHighlights() {
+    $('.square-55d63').removeClass('selected-sq');
+  }
+
+  function highlightSquare(square) {
+    clearHighlights();
+    $('.square-' + square).addClass('selected-sq');
+  }
+
+  // ---- Board animation ----
+  function animateMove(uci, callback) {
+    var from  = uci.slice(0, 2);
+    var to    = uci.slice(2, 4);
+    var promo = uci.length > 4 ? uci[4] : 'q';
+
+    var result = game.move({ from: from, to: to, promotion: promo });
+    if (result === null) {
+      if (callback) callback();
+      return;
+    }
+    board.position(game.fen(), true);
+    setTimeout(function () { if (callback) callback(); }, 350);
+  }
+
+  // ---- Tap-to-move handler ----
+  function handleSquareClick(square, piece) {
+    if (locked) return;
+    var turn = game.turn();
+
+    if (selectedSquare !== null) {
+      if (square === selectedSquare) {
+        clearHighlights(); selectedSquare = null; return;
+      }
+      if (piece && piece[0] === turn) {
+        selectedSquare = square; highlightSquare(square); return;
+      }
+      var movingPiece = game.get(selectedSquare);
+      var isPromo = movingPiece && movingPiece.type === 'p' &&
+                    ((turn === 'w' && square[1] === '8') || (turn === 'b' && square[1] === '1'));
+      var test = game.move({ from: selectedSquare, to: square, promotion: 'q' });
+      if (test === null) { clearHighlights(); selectedSquare = null; return; }
+      game.undo();
+      lastSource = selectedSquare;
+      lastTarget = square;
+      clearHighlights(); selectedSquare = null; locked = true;
+      submitMove(lastSource + lastTarget + (isPromo ? 'q' : ''));
+      return;
+    }
+
+    if (piece && piece[0] === turn) {
+      selectedSquare = square; highlightSquare(square);
+    }
+  }
+
+  // ---- Drag-and-drop handler ----
+  function handleDrop(source, target, piece) {
+    if (locked) return 'snapback';
+
+    var isPromo = piece && piece[1] === 'P' &&
+                  ((piece[0] === 'w' && target[1] === '8') ||
+                   (piece[0] === 'b' && target[1] === '1'));
+
+    var testMove = game.move({ from: source, to: target, promotion: 'q' });
+    if (testMove === null) return 'snapback';
+    game.undo();
+
+    clearHighlights(); selectedSquare = null;
+    lastSource = source;
+    lastTarget = target;
+    locked = true;
+
+    submitMove(source + target + (isPromo ? 'q' : ''));
+  }
+
+  // ---- Submit to server ----
+  function submitMove(uci) {
+    fetch(ATTEMPT_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ move: uci })
+    })
+    .then(function (r) { return r.json(); })
+    .then(handleAttemptResponse)
+    .catch(function () {
+      showToast('Network error — try again');
+      locked = false;
+    });
+  }
+
+  // ---- Handle server response ----
+  function handleAttemptResponse(data) {
+    clearHighlights(); selectedSquare = null;
+
+    if (!data.correct) {
+      flashBoard('red');
+      showToast('Not quite —');
+      stopTimer();
+
+      game.move({ from: lastSource, to: lastTarget, promotion: 'q' });
+      board.position(game.fen());
+
+      setTimeout(function () {
+        game.undo();
+        board.position(game.fen());
+        setTimeout(function () {
+          animateMove(data.correct_move, function () {
+            showExplanationCard(data.correct_move, data.correct_move_label, data.explanation, data.next_url, data.re_queued);
+          });
+        }, 200);
+      }, 600);
+      return;
+    }
+
+    if (!data.complete) {
+      game.move({ from: lastSource, to: lastTarget, promotion: 'q' });
+      board.position(game.fen());
+      flashBoard('green');
+      setTimeout(function () {
+        animateMove(data.animate_move, function () { locked = false; });
+      }, 300);
+      return;
+    }
+
+    flashBoard('green');
+    showToast('Yes!');
+    stopTimer();
+    game.move({ from: lastSource, to: lastTarget, promotion: 'q' });
+    board.position(game.fen());
+    showPraiseCard(data.praise, data.next_url);
+  }
+
+  // ---- Flash board ring ----
+  function flashBoard(color) {
+    var wrapper = document.getElementById('board-wrapper');
+    var cls = color === 'green'
+      ? 'ring-4 ring-green-400 ring-offset-2 ring-offset-gray-950 rounded'
+      : 'ring-4 ring-red-500 ring-offset-2 ring-offset-gray-950 rounded';
+    wrapper.classList.add(...cls.split(' '));
+    setTimeout(function () { wrapper.classList.remove(...cls.split(' ')); }, 600);
+  }
+
+  // ---- Explanation card ----
+  function showExplanationCard(correctUci, correctLabel, explanation, nextUrl, reQueued) {
+    var card = document.getElementById('explanation-card');
+    document.getElementById('explanation-move').textContent =
+      'The winning move was: ' + (correctLabel || correctUci.toUpperCase());
+    document.getElementById('explanation-text').textContent =
+      explanation || 'Study this position carefully before continuing.';
+    var retryNote = document.getElementById('retry-note');
+    if (retryNote) {
+      retryNote.style.display = reQueued ? 'block' : 'none';
+    }
+    document.getElementById('next-btn').href = nextUrl;
+    card.classList.remove('hidden');
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // ---- Praise card ----
+  function showPraiseCard(praise, nextUrl) {
+    var card = document.getElementById('praise-card');
+    document.getElementById('praise-text').textContent =
+      praise || 'Yes! That was the winning move — you spotted it perfectly.';
+    document.getElementById('praise-next-btn').href = nextUrl;
+    card.classList.remove('hidden');
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // ---- Toast ----
+  function showToast(message) {
+    var label = document.getElementById('side-label');
+    if (label) label.textContent = message;
+  }
+
+  // ---- Skip ----
+  function skipPuzzle() {
+    if (locked && document.getElementById('explanation-card').classList.contains('hidden')) return;
+    locked = true;
+    stopTimer();
+    fetch(SKIP_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) { window.location.href = data.next_url; });
+  }
+
+})();
+</script>
+{% endblock %}
