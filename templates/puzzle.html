@@ -14,23 +14,23 @@
   .highlight-legal::after {
     content: '';
     position: absolute;
-    width: 33%; height: 33%;
-    background: rgba(0,0,0,0.22);
+    width: 38%; height: 38%;
+    background: rgba(245, 158, 11, 0.55);
     border-radius: 50%;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     pointer-events: none;
-    z-index: 2;
+    z-index: 10;
   }
 
   /* Ring on capturable squares */
   .highlight-capture::after {
     content: '';
     position: absolute;
-    inset: 0;
-    background: radial-gradient(transparent 56%, rgba(0,0,0,0.22) 56%);
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(transparent 54%, rgba(245, 158, 11, 0.55) 54%);
     pointer-events: none;
-    z-index: 2;
+    z-index: 10;
   }
 </style>
 {% endblock %}
