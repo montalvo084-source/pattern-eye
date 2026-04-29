@@ -92,10 +92,12 @@ def get_puzzle(puzzle_id: int):
     return db.execute('SELECT * FROM puzzles WHERE id = ?', (puzzle_id,)).fetchone()
 
 
+SESSION_SIZE = 4
+
 def get_puzzles_for_session(rating: int, weak_themes: list) -> list:
     db = get_db()
 
-    def _fetch(low, high, limit=10):
+    def _fetch(low, high, limit=SESSION_SIZE):
         if weak_themes:
             like_clauses = ' OR '.join(['themes LIKE ?' for _ in weak_themes])
             params = [low, high] + [f'%{t}%' for t in weak_themes] + [limit]
@@ -114,13 +116,13 @@ def get_puzzles_for_session(rating: int, weak_themes: list) -> list:
         return [r['id'] for r in rows]
 
     ids = _fetch(rating, rating + 100)
-    if len(ids) < 10:
+    if len(ids) < SESSION_SIZE:
         ids = _fetch(max(400, rating - 200), rating + 200)
-    if len(ids) < 10:
-        rows = db.execute('SELECT id FROM puzzles ORDER BY RANDOM() LIMIT 10').fetchall()
+    if len(ids) < SESSION_SIZE:
+        rows = db.execute(f'SELECT id FROM puzzles ORDER BY RANDOM() LIMIT {SESSION_SIZE}').fetchall()
         ids = [r['id'] for r in rows]
 
-    return ids[:10]
+    return ids[:SESSION_SIZE]
 
 
 def get_user_stats():

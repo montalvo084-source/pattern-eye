@@ -214,9 +214,9 @@ def start_session():
     if not puzzle_ids:
         return render_template('index.html', stats=stats, error='No puzzles found. Run the import script first.')
 
-    # Spaced repetition: tick queue and prepend due puzzles
+    # Spaced repetition: tick queue and prepend due puzzles (cap at 1 for 4-puzzle sessions)
     db.tick_sr_queue()
-    sr_ids = db.get_sr_due_puzzles(3)
+    sr_ids = db.get_sr_due_puzzles(1)
     # Avoid duplicates between SR ids and fresh puzzle ids
     fresh_ids = [pid for pid in puzzle_ids if pid not in sr_ids]
     combined_ids = sr_ids + fresh_ids
@@ -448,9 +448,9 @@ def session_summary():
 
     session.pop('training', None)
 
-    if correct_count >= 8:
-        session_message = "Strong session. Your pattern recognition is building."
-    elif correct_count >= 5:
+    if correct_count == 4:
+        session_message = "Perfect session. Your pattern recognition is building."
+    elif correct_count >= 3:
         session_message = "Solid work. The ones you missed are the ones you'll remember."
     else:
         session_message = "Tough session — but studying hard puzzles is how you improve fastest."
@@ -461,7 +461,7 @@ def session_summary():
         stats=stats,
         correct_count=correct_count,
         incorrect_count=incorrect_count,
-        total=10,
+        total=len(training.get('puzzle_ids', [])) or 4,
         session_message=session_message,
     )
 
