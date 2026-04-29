@@ -5,10 +5,33 @@
 <link rel="stylesheet"
       href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
 <style>
-  #board .square-55d63 { transition: background-color 0.15s; }
+  #board .square-55d63 { transition: background-color 0.15s; position: relative; }
   .highlight-correct { background-color: rgba(74, 222, 128, 0.45) !important; }
   .highlight-wrong   { background-color: rgba(239, 68, 68, 0.45) !important; }
   .selected-sq       { background-color: rgba(251,191,36,0.35) !important; }
+
+  /* Dot on empty legal-move squares */
+  .highlight-legal::after {
+    content: '';
+    position: absolute;
+    width: 33%; height: 33%;
+    background: rgba(0,0,0,0.22);
+    border-radius: 50%;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* Ring on capturable squares */
+  .highlight-capture::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(transparent 56%, rgba(0,0,0,0.22) 56%);
+    pointer-events: none;
+    z-index: 2;
+  }
 </style>
 {% endblock %}
 
@@ -185,12 +208,21 @@
 
   // ---- Highlight helpers (for tap-to-move) ----
   function clearHighlights() {
-    $('.square-55d63').removeClass('selected-sq');
+    $('.square-55d63').removeClass('selected-sq highlight-legal highlight-capture');
   }
 
   function highlightSquare(square) {
     clearHighlights();
     $('.square-' + square).addClass('selected-sq');
+    // Show legal move dots/rings for this piece
+    var moves = game.moves({ square: square, verbose: true });
+    moves.forEach(function (move) {
+      if (game.get(move.to)) {
+        $('.square-' + move.to).addClass('highlight-capture');
+      } else {
+        $('.square-' + move.to).addClass('highlight-legal');
+      }
+    });
   }
 
   // ---- Board animation ----
