@@ -32,6 +32,13 @@
     pointer-events: none;
     z-index: 10;
   }
+
+  /* Prevent iOS from scrolling the page when touching the board */
+  #board, #board * {
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
 </style>
 {% endblock %}
 
@@ -155,15 +162,41 @@
     game = new Chess();
     game.load(FEN);
 
+    var isTouchDevice = navigator.maxTouchPoints > 0;
+
     board = Chessboard('board', {
       position:      FEN,
       orientation:   ORIENTATION,
-      draggable:     true,
+      draggable:     !isTouchDevice,
       pieceTheme:    'https://lichess1.org/assets/piece/cburnett/{piece}.svg',
       onDrop:        handleDrop,
       onSnapEnd:     function () { board.position(game.fen()); },
       onSquareClick: handleSquareClick
     });
+
+    // iOS Safari: chessboardjs click events can be suppressed by touch handling.
+    // Wire up touchend directly so taps always register as square clicks.
+    if (isTouchDevice) {
+      document.getElementById('board').addEventListener('touchend', function (e) {
+        var touch = e.changedTouches[0];
+        var el = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (!el) return;
+        var sq = el.closest
+          ? el.closest('[data-square]')
+          : null;
+        if (!sq) {
+          // walk up manually for older iOS
+          var cur = el;
+          while (cur && !cur.dataset.square) cur = cur.parentElement;
+          sq = cur;
+        }
+        if (!sq || !sq.dataset.square) return;
+        e.preventDefault();
+        var square = sq.dataset.square;
+        var piece  = game.get(square);
+        handleSquareClick(square, piece ? (piece.color === 'w' ? 'w' : 'b') + piece.type.toUpperCase() : null);
+      }, { passive: false });
+    }
 
     setTimeout(function () {
       animateMove(MOVES[0], function () {
