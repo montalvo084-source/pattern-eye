@@ -174,27 +174,32 @@
       onSquareClick: handleSquareClick
     });
 
-    // iOS Safari: chessboardjs click events can be suppressed by touch handling.
-    // Wire up touchend directly so taps always register as square clicks.
+    // On touch devices: block scroll on touchstart so the board never slides,
+    // then resolve the tapped square via its CSS class (chessboard.js uses
+    // classes like "square-e4", not data attributes).
     if (isTouchDevice) {
-      document.getElementById('board').addEventListener('touchend', function (e) {
+      var boardEl = document.getElementById('board');
+
+      boardEl.addEventListener('touchstart', function (e) {
+        e.preventDefault();
+      }, { passive: false });
+
+      boardEl.addEventListener('touchend', function (e) {
+        e.preventDefault();
         var touch = e.changedTouches[0];
         var el = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (!el) return;
-        var sq = el.closest
-          ? el.closest('[data-square]')
-          : null;
-        if (!sq) {
-          // walk up manually for older iOS
-          var cur = el;
-          while (cur && !cur.dataset.square) cur = cur.parentElement;
-          sq = cur;
+        var square = null;
+        var cur = el;
+        while (cur && cur !== boardEl) {
+          var m = (cur.className || '').match(/\bsquare-([a-h][1-8])\b/);
+          if (m) { square = m[1]; break; }
+          cur = cur.parentElement;
         }
-        if (!sq || !sq.dataset.square) return;
-        e.preventDefault();
-        var square = sq.dataset.square;
-        var piece  = game.get(square);
-        handleSquareClick(square, piece ? (piece.color === 'w' ? 'w' : 'b') + piece.type.toUpperCase() : null);
+        if (!square) return;
+        var piece = game.get(square);
+        handleSquareClick(square, piece
+          ? (piece.color === 'w' ? 'w' : 'b') + piece.type.toUpperCase()
+          : null);
       }, { passive: false });
     }
 
