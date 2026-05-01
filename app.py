@@ -175,17 +175,15 @@ def _get_ai_praise(puzzle, moves: list, move_step: int, correct_uci: str) -> str
         client = anthropic.Anthropic(api_key=api_key)
         msg = client.messages.create(
             model='claude-haiku-4-5-20251001',
-            max_tokens=120,
+            max_tokens=60,
             system=(
-                'You are an enthusiastic chess coach. The player just found the right move! '
-                'Write exactly 2 sentences. '
-                'Sentence 1: Celebrate genuinely — be warm and specific to what they just did, not a generic "Great job!". '
-                'Sentence 2: Explain in plain English what made their move so powerful — what it attacked or threatened, and why the opponent had no good answer. '
-                'No chess jargon. Write like you are texting a friend who just did something impressive.'
+                'You are a chess coach. In one short sentence (max 20 words), '
+                'explain exactly why the move wins — what it attacks or forces. '
+                'No praise, no filler. Just the key idea.'
             ),
             messages=[{
                 'role': 'user',
-                'content': f'Position (FEN): {board.fen()}\nThe player played: {san_move}\nCelebrate and explain why this move wins.'
+                'content': f'Position (FEN): {board.fen()}\nMove played: {san_move}\nWhy does this win?'
             }]
         )
         return msg.content[0].text
